@@ -277,6 +277,31 @@ void copyInterior(uchar4* d_blendedImg,
     }
 }
 
+__global__
+void separateChannels(const uchar4* const d_sourceImg,
+                            const uchar4* const d_destImg,
+                            unsigned char* red_src,
+                            unsigned char* blue_src,
+                            unsigned char* green_src,
+                            unsigned char* red_dst,
+                            unsigned char* blue_dst,
+                            unsigned char* green_dst,
+                            const int srcSize)
+{
+    int threadId = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (threadId >= srcSize)
+        return;
+
+    red_dst[threadId] = d_destImg[threadId].x;
+    blue_dst[threadId] = d_destImg[threadId].y;
+    green_dst[threadId] = d_destImg[threadId].z;
+
+    red_src[threadId] = d_sourceImg[threadId].x;
+    blue_src[threadId] = d_sourceImg[threadId].y;
+    green_src[threadId] = d_sourceImg[threadId].z;
+}
+
 void your_blend(const uchar4* const h_sourceImg,  //IN
                 const size_t numRowsSource, const size_t numColsSource,
                 const uchar4* const h_destImg, //IN
@@ -341,13 +366,8 @@ void your_blend(const uchar4* const h_sourceImg,  //IN
     cudaMalloc(&red_dst, srcSize*sizeof(unsigned char));
     cudaMalloc(&blue_dst, srcSize*sizeof(unsigned char));
     cudaMalloc(&green_dst, srcSize*sizeof(unsigned char));
-    
-    separateChannels<<<K, threadsPerBlock>>>(d_sourceImg, d_destImg, red_src, blue_src, green_src,
-                           red_dst, blue_dst, green_dst, srcSize);
-    
-    cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
-    
-     /*
+
+    /*
      4) Create two float(!) buffers for each color channel that will
         act as our guesses.  Initialize them to the respective color
         channel of the source image since that will act as our intial guess. */
